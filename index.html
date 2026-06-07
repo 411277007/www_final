@@ -695,31 +695,61 @@
             alert("🎉 登入成功！歡迎回來。");
         }
 
-        function handleRegister(e) {
-            e.preventDefault();
-            const name = document.getElementById('regName').value.trim();
-            const email = document.getElementById('regUser').value.trim();
-            const pw = document.getElementById('regPw').value;
-            const pwConfirm = document.getElementById('regPwConfirm').value;
+        async function handleRegister(e) {
+    e.preventDefault();
+    // 如果你的 HTML 註冊表單裡有姓名欄位，可以留著當快取；如果沒有，這一行可以刪除
+    const name = document.getElementById('regName') ? document.getElementById('regName').value.trim() : '';
+    
+    const email = document.getElementById('regUser').value.trim();
+    const pw = document.getElementById('regPw').value;
+    const pwConfirm = document.getElementById('regPwConfirm').value;
 
-            if (pw !== pwConfirm) {
-                alert("❌ 兩次密碼輸入不一致！");
-                return;
-            }
+    if (pw !== pwConfirm) {
+        alert("❌ 兩次密碼輸入不一致！");
+        return;
+    }
 
-            localStorage.setItem('regName_' + email, name);
+    // 🎯 修改這裡：只打包後端 users 資料表需要的 email 與 password
+    const registerData = {
+        email: email,
+        password: pw
+    };
+
+    try {
+        // 發送給後端 PHP 寫入 MySQL
+        const response = await fetch('./register_api.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(registerData)
+        });
+        const result = await response.json();
+
+        if (result.status === 'success') {
+            // 後端寫入成功後，前端維持登入狀態
+            localStorage.setItem('regName_' + email, name || email); // 若沒填姓名就用 email 代替
             localStorage.setItem('user', email);
 
+            // 關閉 Modal 彈窗
             const modalEl = document.getElementById('registerModal');
             const modal = bootstrap.Modal.getInstance(modalEl);
             if (modal) modal.hide();
 
+            // 觸發你原本網頁的更新 UI 邏輯
             checkUserStatus();
             loadUserCart();
             updateCartUI();
             showSection('home');
-            alert("✨ 註冊成功！已自動為您登入。");
+            
+            alert("✨ 註冊成功！帳號已同步存入資料庫，並自動為您登入。");
+        } else {
+            alert("❌ 註冊失敗：" + result.message);
         }
+
+    } catch (error) {
+        console.error("註冊連線發生錯誤:", error);
+        alert("註冊系統連線失敗！");
+    }
+}
 
         function logout() {
             localStorage.removeItem('user');

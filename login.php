@@ -1,41 +1,66 @@
-<?php
-// login.php
-header('Content-Type: application/json; charset=utf-8');
-header('Access-Control-Allow-Origin: *');
+async function handleLogin(e) {
+    e.preventDefault();
+    
+    // 1. 抓取 HTML 登入表單輸入框的值（請確認你的 HTML input id 是否為 loginUser 和 loginPw）
+    const email = document.getElementById('loginUser').value.trim();
+    const pw = document.getElementById('loginPw').value;
 
-require_once 'db.php';
-
-// 接收前端傳來的 JSON 資料
-$data = json_decode(file_get_contents('php://input'), true);
-$username = trim($data['username'] ?? '');
-$password = trim($data['password'] ?? '');
-
-// 🛑 後端二次防線：如果前端傳過來的欄位是空的，回傳無帳號或密碼的錯誤
-if (empty($username) || empty($password)) {
-    echo json_encode(["status" => "error", "message" => "無帳號或密碼，請重新輸入！"]);
-    exit;
-}
-
-try {
-    // 1. 從資料庫撈取該帳號的資料
-    $stmt = $pdo->prepare("SELECT * FROM users WHERE username = ?");
-    $stmt->execute([$username]);
-    $user = $stmt->fetch(PDO::FETCH_ASSOC);
-
-    // 2. 驗證帳號是否存在，以及加密密碼是否相符
-    if ($user && password_verify($password, $user['password'])) {
-        echo json_encode([
-            "status" => "success",
-            "message" => "登入成功！",
-            "username" => $user['username']
-        ]);
-    } else {
-        // 帳號不存在或密碼錯誤的提示
-        echo json_encode(["status" => "error", "message" => "帳號或密碼錯誤，請重新確認！"]);
+    // 🛑 前端第一道防線：防呆檢查
+    if (!email || !pw) {
+        alert("❌ 請輸入帳號與密碼！");
+        return;
     }
 
-} catch (PDOException $e) {
-    http_response_code(500);
-    echo json_encode(["status" => "error", "message" => "系統錯誤: " . $e->getMessage()]);
+    // 🎯 關鍵對接：打包成 JSON。
+    // 因為你的 PHP 寫的是 $data['username']，所以這裡的 Key 必須叫做 username
+    const loginData = {
+        username: email,
+        password: pw
+    };
+
+    try {
+        // 🎯 發送請求到你的後端 login.php
+        const response = await fetch('./login.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(loginData)
+        });
+        
+        const result = await response.json();
+
+        // 2. 根據後端回傳的 status 進行判斷
+        if (result.status === 'success') {
+            // 登入成功，將帳號寫入前端 localStorage 快取以維持登入狀態
+            localStorage.setItem('user', result.username);
+            
+            // 如果你原本前端有用到姓名快取（例如顯示 "歡迎 XXX"），這裏預設用帳號
+            if (!localStorage.getItem('regName_' + result.username)) {
+                localStorage.setItem('regName_' + result.username, result.username);
+            }
+
+            // 關閉 Bootstrap 登入 Modal 彈窗
+            const modalEl = document.getElementById('loginModal');
+            const modal = bootstrap.Modal.getInstance(modalEl);
+            if (modal) modal.hide();
+
+            // 清空輸入框
+            document.getElementById('loginUser').value = '';
+            document.getElementById('loginPw').value = '';
+
+            // 觸發你網頁原本更新 UI 的功能（切換右上角按鈕、載入購物車等）
+            checkUserStatus();
+            loadUserCart();
+            updateCartUI();
+            showSection('home');
+            
+            alert("👋 歡迎回來！登入成功。");
+        } else {
+            // 登入失敗，跳出後端回傳的錯誤訊息（例如："帳號或密碼錯誤，請重新確認！"）
+            alert("❌ " + result.message);
+        }
+
+    } catch (error) {
+        console.error("登入連線發生錯誤:", error);
+        alert("結帳系統連線失敗或後端程式錯誤！請檢查 F12 Network 畫面。");
+    }
 }
-?>

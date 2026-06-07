@@ -412,12 +412,19 @@ async function handleRegister(e) {
 }
 
 // --- 登入連線處理 (修正後端連線版) ---
+// --- 登入連線處理 (加入空白欄位檢查) ---
 async function handleLogin(e) { 
     e.preventDefault(); 
     
-    // 抓取前端輸入框的值
-    const username = document.getElementById('loginUser').value; // 請確保 HTML 的登入帳號 input 有 id="loginUser"
-    const password = document.getElementById('loginPw').value;   // 請確保 HTML 的登入密碼 input 有 id="loginPw"
+    // 抓取前端輸入框的值，並用 .trim() 去除前後空白
+    const username = document.getElementById('loginUser').value.trim(); 
+    const password = document.getElementById('loginPw').value.trim();   
+    
+    // 🛑 核心防呆：如果帳號或密碼其中一個沒填，直接彈窗擋下，不發送請求
+    if (username === "" || password === "") {
+        alert("❌ 登入失敗：請輸入帳號或密碼！");
+        return; // 中斷執行
+    }
     
     try {
         // 發送非同步請求給後端 PHP 驗證帳密
@@ -431,10 +438,10 @@ async function handleLogin(e) {
         
         if (result.status === 'success') {
             alert("🔑 歡迎回來！登入成功。");
-            // 將從資料庫回傳的正確使用者名稱存入本機
             localStorage.setItem('user', result.username); 
-            location.reload(); // 重新整理頁面以更新畫面與專屬購物車
+            location.reload(); 
         } else {
+            // 如果後端傳回錯誤（例如：帳密錯誤），這裡會顯示後端的訊息
             alert("❌ 登入失敗：" + result.message);
         }
     } catch (error) {

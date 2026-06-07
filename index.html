@@ -678,21 +678,68 @@
             }
         }
 
-        function handleLogin(e) {
+        // 🎯 修正後的非同步登入功能（與後端 login.php 正確對接）
+        async function handleLogin(e) {
             e.preventDefault();
             const email = document.getElementById('loginUser').value.trim();
-            localStorage.setItem('user', email);
-            
-            // 登入後關閉 Modal
-            const modalEl = document.getElementById('loginModal');
-            const modal = bootstrap.Modal.getInstance(modalEl);
-            if (modal) modal.hide();
-            
-            checkUserStatus();
-            loadUserCart();
-            updateCartUI();
-            showSection('home');
-            alert("🎉 登入成功！歡迎回來。");
+            const pw = document.getElementById('loginPw').value; // 🌟 抓取 HTML 的密碼輸入框
+
+            // 前端初步檢查
+            if (!email || !pw) {
+                alert("❌ 請輸入帳號與密碼！");
+                return;
+            }
+
+            // 打包成 JSON 資料，配合你的 login.php，欄位 key 必須為 username 與 password
+            const loginData = {
+                username: email,
+                password: pw
+            };
+
+            try {
+                // 發送請求給後端驗證
+                const response = await fetch('./login.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(loginData)
+                });
+                
+                const result = await response.json();
+
+                // 🌟 使用三個等號嚴格判斷後端回傳結果
+                if (result.status === 'success') {
+                    // 後端資料庫認證成功，才准許寫入登入狀態
+                    localStorage.setItem('user', result.username);
+                    
+                    if (!localStorage.getItem('regName_' + result.username)) {
+                        localStorage.setItem('regName_' + result.username, result.username);
+                    }
+
+                    // 登入後關閉 Modal
+                    const modalEl = document.getElementById('loginModal');
+                    const modal = bootstrap.Modal.getInstance(modalEl);
+                    if (modal) modal.hide();
+
+                    // 清空輸入框
+                    document.getElementById('loginUser').value = '';
+                    document.getElementById('loginPw').value = '';
+                    
+                    // 觸發你的 UI 更新邏輯
+                    checkUserStatus();
+                    loadUserCart();
+                    updateCartUI();
+                    showSection('home');
+                    
+                    alert("👋 歡迎回來！登入成功。");
+                } else {
+                    // ❌ 密碼錯誤或帳號不存在，被後端打槍，顯示錯誤訊息並阻止登入
+                    alert("❌ 登入失敗：" + result.message);
+                }
+
+            } catch (error) {
+                console.error("登入連線發生錯誤:", error);
+                alert("登入系統連線失敗，請檢查資料庫或網路連線！");
+            }
         }
 
         async function handleRegister(e) {
@@ -717,7 +764,7 @@
 
     try {
         // 發送給後端 PHP 寫入 MySQL
-        const response = await fetch('./register_api.php', {
+        const response = await fetch('./register.php', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(registerData)

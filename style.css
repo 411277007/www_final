@@ -1,0 +1,91 @@
+/* 自訂品牌色彩與全域變數 */
+:root {
+    --primary-color: #0d47a1; /* 深藍色，呼應你先前的 UI 規劃 */
+    --hover-color: #f8f9fa;
+    --text-color: #333333;
+}
+
+body {
+    color: var(--text-color);
+    font-family: 'Noto Sans TC', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+/* 導覽列 */
+.easygo-navbar {
+    background-color: var(--primary-color);
+}
+.navbar-brand {
+    cursor: pointer;
+    transition: opacity 0.2s;
+}
+.navbar-brand:hover {
+    opacity: 0.8;
+}
+
+/* 側邊欄分類選單 */
+.category-sidebar .list-group-item {
+    border: none;
+    padding: 1rem 1.25rem;
+    color: #555;
+    transition: all 0.2s ease;
+}
+.category-sidebar .list-group-item:hover {
+    background-color: var(--hover-color);
+    padding-left: 1.5rem; /* Hover 時微幅向右推移 */
+}
+.category-sidebar .list-group-item.active {
+    background-color: var(--primary-color);
+    color: white;
+    font-weight: bold;
+    border-radius: 8px; /* 柔和的邊角 */
+}
+
+/* 搜尋列 */
+.search-bar-wrapper .form-control:focus {
+    box-shadow: none;
+    border-color: #ced4da;
+}
+
+/* 商品卡片設計 */
+.product-card {
+    border-radius: 12px;
+    overflow: hidden;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+.product-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 20px rgba(0,0,0,0.1) !important;
+}
+.product-card img {
+    height: 200px;
+    object-fit: cover; /* 確保各種比例的圖片都不會變形 */
+}
+.text-orange {
+    color: #fd7e14;
+}
+
+/* 浮動購物車按鈕 */
+.floating-cart-btn {
+    position: fixed;
+    bottom: 30px;
+    right: 30px;
+    width: 65px;
+    height: 65px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1050;
+    transition: transform 0.2s;
+}
+.floating-cart-btn:hover {
+    transform: scale(1.1);
+}
+
+/* 確保彈窗圓角現代化 */
+.modal-content {
+    border-radius: 16px;
+}
+.form-control {
+    padding: 0.75rem 1rem;
+}

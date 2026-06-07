@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EasyGo 超級賣場 | 信用卡付款完整版</title>
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        :root { --primary-color: #0f4c81; --accent-color: #ff9f43; }
+        body { background-color: #f4f6f9; font-family: "Microsoft JhengHei", sans-serif; }
+        .navbar { background-color: var(--primary-color); }
+        .product-card { transition: 0.3s; cursor: pointer; border: none; border-radius: 10px; overflow: hidden; }
+        .product-card:hover { transform: translateY(-5px); box-shadow: 0 10px 20px rgba(0,0,0,0.15); }
+        .cart-fixed { position: fixed; bottom: 20px; right: 20px; z-index: 1000; }
+        .hidden { display: none !important; }
+        .section-container { animation: fadeIn 0.4s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .detail-img { max-height: 400px; object-fit: cover; width: 100%; border-radius: 10px; }
+        .list-group-item.active { background-color: var(--primary-color); border-color: var(--primary-color); }
+        .card-input-box { background: #f8f9fa; border: 1px dashed #ced4da; border-radius: 8px; padding: 20px; }
+    </style>
+</head>
+<body>
+    <!-- 導覽列 -->
+    <nav class="navbar navbar-expand-lg navbar-dark sticky-top shadow-sm">
+        <div class="container">
+            <a class="navbar-brand fw-bold" href="#" onclick="showSection('home')">🛒 EasyGo 賣場</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto"><li class="nav-item"><a class="nav-link active" href="#" onclick="showSection('home')">首頁</a></li></ul>
+                <div class="d-flex" id="authButtons">
+                    <button class="btn btn-outline-light me-2" data-bs-toggle="modal" data-bs-target="#loginModal">登入</button>
+                    <button class="btn btn-warning fw-bold" data-bs-toggle="modal" data-bs-target="#registerModal">註冊</button>
+                </div>
+                <div class="d-flex align-items-center hidden" id="userInfo">
+                    <span id="userGreeting" class="text-white me-3 fw-bold"></span>
+                    <button class="btn btn-outline-danger btn-sm bg-white" onclick="logout()">登出</button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- 主內容容器 -->
+    <main class="container mt-4 mb-5">
+        
+        <div id="homeSection" class="section-container">
+            <div class="row">
+                <div class="col-lg-3 col-md-4 mb-4">
+                    <div class="list-group shadow-sm sticky-top" style="top: 80px;">
+                        <button class="list-group-item list-group-item-action active fw-bold sidebar-btn" onclick="filterSidebar('全部', this)">📦 所有商品</button>
+                        <button class="list-group-item list-group-item-action sidebar-btn" onclick="filterSidebar('生鮮', this)">🥩 生鮮食品</button>
+                        <button class="list-group-item list-group-item-action sidebar-btn" onclick="filterSidebar('餅乾', this)">🍪 餅乾零食</button>
+                        <button class="list-group-item list-group-item-action sidebar-btn" onclick="filterSidebar('麵包', this)">🍞 新鮮麵包</button>
+                        <button class="list-group-item list-group-item-action sidebar-btn" onclick="filterSidebar('化妝品', this)">💄 美妝保養</button>
+                        <button class="list-group-item list-group-item-action sidebar-btn" onclick="filterSidebar('衣服', this)">👕 流行服飾</button>
+                    </div>
+                </div>
+                <div class="col-lg-9 col-md-8">
+                    <div class="row mb-4"><div class="col-12"><input type="text" id="searchInput" class="form-control form-control-lg shadow-sm" placeholder="🔍 在此分類中搜尋商品..." onkeyup="searchProducts()"></div></div>
+                    <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4" id="productGrid"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================= 商品詳細資訊頁面 ================= -->
+        <div id="detailSection" class="section-container hidden">
+            <button class="btn btn-outline-secondary mb-3" onclick="showSection('home')">⬅ 返回列表</button>
+            <div class="row bg-white p-4 rounded shadow-sm" id="detailContent"></div>
+        </div>
+
+        <!-- ================= 購物車頁面 ================= -->
+        <div id="cartSection" class="section-container hidden">
+            <h2 class="mb-4 fw-bold">您的購物車</h2>
+            <div class="row">
+                <div class="col-lg-8"><div id="cartItemsList" class="bg-white p-4 rounded shadow-sm mb-3"></div></div>
+                <div class="col-lg-4">
+                    <div class="bg-white p-4 rounded shadow-sm">
+                        <h4 class="fw-bold">訂單摘要</h4><hr>
+                        <div class="d-flex justify-content-between mb-2"><span>商品小計</span><span id="subtotal">$0</span></div>
+                        <div class="d-flex justify-content-between mb-2"><span>運費</span><span>$60</span></div>
+                        <h4 class="d-flex justify-content-between mt-3 text-danger fw-bold"><span>總計</span><span id="totalPrice">$0</span></h4>
+                        <button class="btn btn-success btn-lg w-100 mt-4" onclick="goToCheckout()">填寫收件資訊</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================= 填寫收件資訊 ================= -->
+        <div id="checkoutFormSection" class="section-container hidden">
+            <div class="row justify-content-center">
+                <div class="col-md-8 bg-white p-5 rounded shadow-sm">
+                    <h3 class="fw-bold mb-4">填寫收件人資訊</h3>
+                    <form id="checkoutForm" onsubmit="reviewOrder(event)">
+                        <div class="row mb-3">
+                            <div class="col-md-6"><label class="form-label">收件人姓名</label><input type="text" id="recvName" class="form-control" required></div>
+                            <div class="col-md-6"><label class="form-label">聯絡電話</label><input type="tel" id="recvPhone" class="form-control" pattern="09[0-9]{8}" placeholder="09xxxxxxxx" required></div>
+                        </div>
+                        <div class="mb-4"><label class="form-label">送達地址</label><input type="text" id="recvAddress" class="form-control" placeholder="請輸入完整地址" required></div>
+                        <div class="d-flex justify-content-between"><button type="button" class="btn btn-outline-secondary" onclick="showSection('cart')">上一步</button><button type="submit" class="btn btn-primary">下一步：付款確認</button></div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================= 付款前確認頁面  ================= -->
+        <div id="checkoutConfirmSection" class="section-container hidden">
+            <div class="row justify-content-center">
+                <div class="col-md-8">
+                    <div class="bg-white p-5 rounded shadow-sm border border-warning">
+                        <h3 class="fw-bold text-center mb-4 text-warning">請確認您的訂單並輸入卡號</h3>
+                        <div class="card mb-4 bg-light"><div class="card-body">
+                            <h5 class="card-title fw-bold">📍 收件資訊</h5>
+                            <p class="mb-1"><strong>姓名：</strong><span id="confName"></span> | <strong>電話：</strong><span id="confPhone"></span></p>
+                            <p class="mb-0"><strong>地址：</strong><span id="confAddress"></span></p>
+                        </div></div>
+                        <h5 class="fw-bold">🛒 購買清單</h5>
+                        <ul class="list-group mb-4" id="confCartItems"></ul>
+
+                        <!-- 信用卡輸入區塊 -->
+                        <div class="card-input-box mb-4">
+                            <h5 class="fw-bold mb-3">💳 信用卡付款資訊</h5>
+                            <div class="mb-3">
+                                <label class="form-label small fw-bold">信用卡號</label>
+                                <input type="text" id="cardNum" class="form-control" placeholder="1234 5678 1234 5678" maxlength="19">
+                            </div>
+                            <div class="row">
+                                <div class="col-6">
+                                    <label class="form-label small fw-bold">有效期限</label>
+                                    <input type="text" id="cardExpiry" class="form-control" placeholder="MM/YY" maxlength="5">
+                                </div>
+                                <div class="col-6">
+                                    <label class="form-label small fw-bold">安全碼 (CVC)</label>
+                                    <input type="text" id="cardCvc" class="form-control" placeholder="123" maxlength="3">
+                                </div>
+                            </div>
+                        </div>
+
+                        <h3 class="text-end text-danger fw-bold mb-4">應付總額：<span id="confTotal"></span></h3>
+                        <div class="d-flex justify-content-between">
+                            <button class="btn btn-outline-secondary" onclick="showSection('checkoutForm')">修改地址</button>
+                            <button class="btn btn-danger btn-lg px-5 shadow" onclick="processPayment()">💳 確認刷卡付款</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- 浮動購物車按鈕 -->
+    <button class="btn btn-warning btn-lg rounded-circle cart-fixed shadow" onclick="showSection('cart')">🛒 <span id="badgeCount" class="badge bg-danger">0</span></button>
+
+    <!-- 登入/註冊 Modal -->
+    <div class="modal fade" id="loginModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content"><div class="modal-header bg-light"><h5 class="modal-title fw-bold">會員登入</h5><button class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><form onsubmit="handleLogin(event)"><input type="email" class="form-control mb-3" placeholder="請輸入 Email" required><input type="password" class="form-control mb-3" placeholder="請輸入密碼" required><button type="submit" class="btn btn-primary w-100">立即登入</button></form></div></div></div></div>
+    <div class="modal fade" id="registerModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content"><div class="modal-header bg-warning"><h5 class="modal-title fw-bold text-dark">註冊新會員</h5><button class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><form onsubmit="handleRegister(event)"><input type="text" class="form-control mb-3" placeholder="真實姓名" required><input type="email" class="form-control mb-3" placeholder="電子信箱" required><input type="password" id="regPw" class="form-control mb-3" placeholder="設定密碼" required><input type="password" id="regPwConfirm" class="form-control mb-3" placeholder="確認密碼" required><button type="submit" class="btn btn-dark w-100">建立帳號</button></form></div></div></div></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const products = [
+            { id: 1, name: "澳洲特級沙朗牛排", price: 350, category: "生鮮", img: "steak.jpg", desc: "嚴選澳洲優質草飼牛，肉質鮮嫩多汁。" },
+            { id: 2, name: "大湖產地直送草莓", price: 180, category: "生鮮", img: "strawberry.jpg", desc: "每日清晨採摘，產地新鮮直送。" },
+            { id: 3, name: "經典巧克力豆餅乾", price: 85, category: "餅乾", img: "chocolate_cookie.jpg", desc: "下午茶的最佳選擇。" },
+            { id: 4, name: "綜合堅果燕麥餅", price: 120, category: "餅乾", img: "nut.jpg", desc: "健康無負擔，低糖配方。" },
+            { id: 5, name: "法式經典長棍麵包", price: 65, category: "麵包", img: "bread.jpg", desc: "外層酥脆、道地法式風味。" },
+            { id: 6, name: "日式紅豆生吐司", price: 150, category: "麵包", img: "toast.jpg", desc: "包裹著微甜不膩的萬丹紅豆。" },
+            { id: 7, name: "持久保濕唇膏", price: 450, category: "化妝品", img: "lipstick.jpg", desc: "長效保濕不掉色。" },
+            { id: 8, name: "全效防曬隔離霜", price: 680, category: "化妝品", img: "UV.jpg", desc: "SPF50+ 高係數防曬。" },
+            { id: 9, name: "純棉短袖T恤 (白)", price: 299, category: "衣服", img: "white_shirt.jpg", desc: "100% 舒適純棉。" },
+            { id: 10, name: "防風防水連帽外套", price: 1280, category: "衣服", img: "jacket.jpg", desc: "具備優異的防風與防潑水功能。" }
+        ];
+
+        let cart = JSON.parse(localStorage.getItem('cart')) || [];
+        let currentCategory = '全部';
+
+        window.onload = () => { renderProducts(products); updateCartUI(); checkUserStatus(); };
+
+        function renderProducts(data) {
+            const grid = document.getElementById('productGrid');
+            grid.innerHTML = data.map(p => `
+                <div class="col"><div class="card h-100 product-card shadow-sm" onclick="showProductDetail(${p.id})">
+                    <img src="${p.img}" class="card-img-top" style="height: 180px; object-fit: cover;">
+                    <div class="card-body text-center">
+                        <span class="badge bg-secondary mb-2">${p.category}</span>
+                        <h5 class="card-title fw-bold fs-6">${p.name}</h5>
+                        <h5 class="text-danger fw-bold">$${p.price}</h5>
+                    </div>
+                </div></div>`).join('');
+        }
+
+        function filterSidebar(cat, btn) {
+            currentCategory = cat;
+            document.querySelectorAll('.sidebar-btn').forEach(b => b.classList.remove('active', 'fw-bold'));
+            btn.classList.add('active', 'fw-bold');
+            renderProducts(cat === '全部' ? products : products.filter(p => p.category === cat));
+        }
+
+        function searchProducts() {
+            const val = document.getElementById('searchInput').value.toLowerCase();
+            const baseData = currentCategory === '全部' ? products : products.filter(p => p.category === currentCategory);
+            renderProducts(baseData.filter(p => p.name.toLowerCase().includes(val)));
+        }
+
+        function showProductDetail(id) {
+            const p = products.find(x => x.id === id);
+            document.getElementById('detailContent').innerHTML = `
+                <div class="col-md-6"><img src="${p.img}" class="detail-img"></div>
+                <div class="col-md-6 d-flex flex-column justify-content-center">
+                    <span class="badge bg-secondary w-25 mb-2">${p.category}</span><h2 class="fw-bold">${p.name}</h2>
+                    <h3 class="text-danger fw-bold my-3">$${p.price}</h3><p class="text-muted fs-5">${p.desc}</p>
+                    <button class="btn btn-primary btn-lg mt-auto shadow" onclick="addToCart(${p.id})">🛒 加入購物車</button>
+                </div>`;
+            showSection('detail');
+        }
+
+        function addToCart(id) {
+            const item = products.find(p => p.id === id);
+            const found = cart.find(c => c.id === id);
+            if (found) found.qty++; else cart.push({...item, qty: 1});
+            saveCart(); alert("✅ 已加入購物車！");
+        }
+
+        function saveCart() { localStorage.setItem('cart', JSON.stringify(cart)); updateCartUI(); }
+
+        function updateCartUI() {
+            document.getElementById('badgeCount').innerText = cart.reduce((a,b) => a + b.qty, 0);
+            const list = document.getElementById('cartItemsList');
+            if (cart.length === 0) { list.innerHTML = "<p class='text-center my-5'>購物車是空的</p>"; return; }
+            list.innerHTML = cart.map(c => `<div class="d-flex align-items-center mb-3 pb-3 border-bottom">
+                <img src="${c.img}" style="width:60px; height:60px; object-fit:cover; border-radius:5px;">
+                <div class="ms-3 flex-grow-1"><h6 class="mb-0">${c.name}</h6><small class="text-danger">$${c.price}</small></div>
+                <div class="d-flex align-items-center">
+                    <button class="btn btn-sm btn-outline-secondary" onclick="changeQty(${c.id}, -1)">-</button><span class="mx-2">${c.qty}</span><button class="btn btn-sm btn-outline-secondary" onclick="changeQty(${c.id}, 1)">+</button>
+                    <button class="btn btn-link text-danger btn-sm ms-2" onclick="removeItem(${c.id})">刪除</button>
+                </div></div>`).join('');
+            const sub = cart.reduce((a,b) => a + (b.price * b.qty), 0);
+            document.getElementById('subtotal').innerText = `$${sub}`;
+            document.getElementById('totalPrice').innerText = `$${sub + 60}`;
+        }
+
+        function changeQty(id, delta) { const item = cart.find(c => c.id === id); item.qty += delta; if (item.qty < 1) removeItem(id); else saveCart(); }
+        function removeItem(id) { cart = cart.filter(c => c.id !== id); saveCart(); }
+
+        function goToCheckout() {
+            if (cart.length === 0) return alert("購物車是空的！");
+            if (!localStorage.getItem('user')) { alert("請先登入！"); return; }
+            showSection('checkoutForm');
+        }
+
+        function reviewOrder(e) {
+            e.preventDefault();
+            document.getElementById('confName').innerText = document.getElementById('recvName').value;
+            document.getElementById('confPhone').innerText = document.getElementById('recvPhone').value;
+            document.getElementById('confAddress').innerText = document.getElementById('recvAddress').value;
+            document.getElementById('confCartItems').innerHTML = cart.map(c => `<li class="list-group-item d-flex justify-content-between">${c.name} x${c.qty} <span>$${c.price * c.qty}</span></li>`).join('');
+            document.getElementById('confTotal').innerText = `$${cart.reduce((a,b) => a + (b.price * b.qty), 0) + 60}`;
+            showSection('checkoutConfirm');
+        }
+
+        // --- 核心更新：處理信用卡付款驗證 ---
+        function processPayment() {
+            const cNum = document.getElementById('cardNum').value;
+            const cExp = document.getElementById('cardExpiry').value;
+            const cCvc = document.getElementById('cardCvc').value;
+
+            // 簡單的資料驗證
+            if (cNum.length < 12 || cExp === "" || cCvc.length < 3) {
+                alert("❌ 請輸入完整的信用卡資訊以完成支付。");
+                return;
+            }
+
+            alert(`💳 授權成功！\n卡號末四碼 ${cNum.slice(-4)} 已成功支付。\n我們會盡快將商品送到：${document.getElementById('confAddress').innerText}`);
+            cart = []; saveCart(); 
+            document.getElementById('checkoutForm').reset();
+            document.getElementById('cardNum').value = ""; // 清空卡號
+            showSection('home');
+        }
+
+        function handleLogin(e) { e.preventDefault(); localStorage.setItem('user', e.target[0].value.split('@')[0]); location.reload(); }
+        function handleRegister(e) { 
+            e.preventDefault(); 
+            const password = document.getElementById('regPw').value;
+            const passwordConfirm = document.getElementById('regPwConfirm').value;
+        if (password !== passwordConfirm) {
+            alert(" 註冊失敗：兩次輸入的密碼不一致，請重新確認！");
+            document.getElementById('regPwConfirm').value = "";
+            document.getElementById('regPwConfirm').focus();
+            return; 
+        }
+        alert("✅ 註冊成功！歡迎加入 EasyGo。"); 
+        bootstrap.Modal.getInstance(document.getElementById('registerModal')).hide(); 
+        e.target.reset();
+    }
+        function checkUserStatus() { const user = localStorage.getItem('user'); if (user) { document.getElementById('authButtons').classList.add('hidden'); document.getElementById('userInfo').classList.remove('hidden'); document.getElementById('userGreeting').innerText = `👋 會員 ${user}`; } }
+        function logout() { localStorage.removeItem('user'); location.reload(); }
+        function showSection(id) { ['home', 'detail', 'cart', 'checkoutForm', 'checkoutConfirm'].forEach(s => document.getElementById(`${s}Section`).classList.add('hidden')); document.getElementById(`${id}Section`).classList.remove('hidden'); window.scrollTo(0, 0); }
+    </script>
+</body>
+</html>

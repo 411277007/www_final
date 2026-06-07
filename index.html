@@ -158,23 +158,33 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        const products = [
-            { id: 1, name: "澳洲特級沙朗牛排", price: 350, category: "生鮮", img: "steak.jpg", desc: "嚴選澳洲優質草飼牛，肉質鮮嫩多汁。" },
-            { id: 2, name: "大湖產地直送草莓", price: 180, category: "生鮮", img: "strawberry.jpg", desc: "每日清晨採摘，產地新鮮直送。" },
-            { id: 3, name: "經典巧克力豆餅乾", price: 85, category: "餅乾", img: "chocolate_cookie.jpg", desc: "下午茶的最佳選擇。" },
-            { id: 4, name: "綜合堅果燕麥餅", price: 120, category: "餅乾", img: "nut.jpg", desc: "健康無負擔，低糖配方。" },
-            { id: 5, name: "法式經典長棍麵包", price: 65, category: "麵包", img: "bread.jpg", desc: "外層酥脆、道地法式風味。" },
-            { id: 6, name: "日式紅豆生吐司", price: 150, category: "麵包", img: "toast.jpg", desc: "包裹著微甜不膩的萬丹紅豆。" },
-            { id: 7, name: "持久保濕唇膏", price: 450, category: "化妝品", img: "lipstick.jpg", desc: "長效保濕不掉色。" },
-            { id: 8, name: "全效防曬隔離霜", price: 680, category: "化妝品", img: "UV.jpg", desc: "SPF50+ 高係數防曬。" },
-            { id: 9, name: "純棉短袖T恤 (白)", price: 299, category: "衣服", img: "white_shirt.jpg", desc: "100% 舒適純棉。" },
-            { id: 10, name: "防風防水連帽外套", price: 1280, category: "衣服", img: "jacket.jpg", desc: "具備優異的防風與防潑水功能。" }
-        ];
-
+        let products = []; // 改為空陣列等待後端資料
         let cart = JSON.parse(localStorage.getItem('cart')) || [];
         let currentCategory = '全部';
 
-        window.onload = () => { renderProducts(products); updateCartUI(); checkUserStatus(); };
+        window.onload = async () => { 
+            await fetchProductsFromAPI(); // 先去後端拿資料
+            updateCartUI(); 
+            checkUserStatus(); 
+        };
+
+// 新增這段向 PHP 索取資料的函式
+        async function fetchProductsFromAPI() {
+            try {
+        // 請確保這裡的網址對應到你伺服器上 get_products.php 的實際路徑
+                const response = await fetch('http://localhost/easygo/get_products.php');
+                const result = await response.json();
+        
+                if (result.status === 'success') {
+                    products = result.data; // 將後端傳來的資料存入全域變數
+                    renderProducts(products); // 渲染畫面
+                } else {
+                    console.error("獲取商品失敗:", result.message);
+                }
+            } catch (error) {
+                console.error("API 連線錯誤:", error);
+            }
+        }
 
         function renderProducts(data) {
             const grid = document.getElementById('productGrid');

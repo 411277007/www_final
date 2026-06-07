@@ -3,7 +3,8 @@
 header('Content-Type: application/json; charset=utf-8');
 header('Access-Control-Allow-Origin: *'); // 允許跨域請求
 
-require_php 'db.php';
+// 修正：改成 PHP 正確的引入語法 require_once
+require_once 'db.php';
 
 try {
     $stmt = $pdo->query("SELECT * FROM products");
@@ -17,13 +18,13 @@ try {
             'price' => (int)$p['price'],
             'category' => $p['category'],
             'img' => $p['img'],
-            'desc' => $p['description']
+            'desc' => $p['description'] // 完美對接前端的 p.desc
         ];
     }, $products);
 
-    echo json_encode(["status" => "success", "data" => $formattedProducts]);
+    echo json_encode(["status" => "success", "data" => $formattedProducts], JSON_UNESCAPED_UNICODE);
 } catch (Exception $e) {
     http_response_code(500);
-    echo json_encode(["status" => "error", "message" => "無法獲取商品"]);
+    echo json_encode(["status" => "error", "message" => "無法獲取商品: " . $e->getMessage()]);
 }
 ?>

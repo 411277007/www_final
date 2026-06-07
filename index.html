@@ -463,65 +463,65 @@
 
         // --- 🔄 修改：付款成功後的表單重設 (手動重設，避免清除剛保存的 localStorage 資料) ---
         async function processPayment() {
-            const cNum = document.getElementById('cardNum').value;
-            const cExp = document.getElementById('cardExpiry').value;
-            const cCvc = document.getElementById('cardCvc').value;
+    const cNum = document.getElementById('cardNum').value;
+    const cExp = document.getElementById('cardExpiry').value;
+    const cCvc = document.getElementById('cardCvc').value;
 
-            if (cNum.length < 12 || cExp === "" || cCvc.length < 3) {
-                alert("❌ 請輸入完整的信用卡資訊以完成支付。");
-                return;
-            }
+    if (cNum.length < 12 || cExp === "" || cCvc.length < 3) {
+        alert("❌ 請輸入完整的信用卡資訊以完成支付。");
+        return;
+    }
 
-            const orderData = {
-                name: document.getElementById('confName').innerText,
-                phone: document.getElementById('confPhone').innerText,
-                address: document.getElementById('confAddress').innerText,
-                total: document.getElementById('confTotal').innerText.replace('$', '')
+    // 🎯 這裡修改：打包要傳給後端的資料，直接把整個 cart 陣列丟給後端
+    const orderData = {
+        name: document.getElementById('confName').innerText,
+        phone: document.getElementById('confPhone').innerText,
+        address: document.getElementById('confAddress').innerText,
+        total: document.getElementById('confTotal').innerText.replace('$', ''),
+        cart_items: cart // 🌟 關鍵新增：直接把購物車陣列打包傳過去
+    };
+
+    try {
+        const response = await fetch('./save_order.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(orderData)
+        });
+        const result = await response.json();
+        
+        if (result.status === 'success') {
+            alert(`💳 授權成功！(訂單編號: #${result.order_id || '10001'})\n付款成功。我們會盡快將商品送達。`);
+            
+            const user = localStorage.getItem('user');
+            const newOrder = {
+                order_id: result.order_id || Math.floor(Math.random() * 90000) + 10000,
+                date: new Date().toLocaleString(),
+                items: [...cart], 
+                total: orderData.total,
+                status: '運輸中'
             };
+            
+            let userOrders = JSON.parse(localStorage.getItem('orders_' + user)) || [];
+            userOrders.unshift(newOrder);
+            localStorage.setItem('orders_' + user, JSON.stringify(userOrders));
+            
+            cart = []; 
+            localStorage.removeItem('cart_' + user); 
+            updateCartUI();
 
-            try {
-                const response = await fetch('./save_order.php', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(orderData)
-                });
-                const result = await response.json();
-                
-                if (result.status === 'success') {
-                    alert(`💳 授權成功！(訂單編號: #${result.order_id || '10001'})\n付款成功。我們會盡快將商品送達。`);
-                    
-                    const user = localStorage.getItem('user');
-                    const newOrder = {
-                        order_id: result.order_id || Math.floor(Math.random() * 90000) + 10000,
-                        date: new Date().toLocaleString(),
-                        items: [...cart], 
-                        total: orderData.total,
-                        status: '運輸中'
-                    };
-                    
-                    let userOrders = JSON.parse(localStorage.getItem('orders_' + user)) || [];
-                    userOrders.unshift(newOrder);
-                    localStorage.setItem('orders_' + user, JSON.stringify(userOrders));
-                    
-                    cart = []; 
-                    localStorage.removeItem('cart_' + user); 
-                    updateCartUI();
-
-                    // 清空付款卡號表單
-                    document.getElementById('cardNum').value = '';
-                    document.getElementById('cardExpiry').value = '';
-                    document.getElementById('cardCvc').value = '';
-                    
-                    showSection('home');
-                } else {
-                    alert("❌ 結帳失敗：" + result.message);
-                }
-            } catch (error) {
-                console.error("結帳連線發生錯誤:", error);
-                alert("結帳系統連線失敗！");
-            }
+            document.getElementById('cardNum').value = '';
+            document.getElementById('cardExpiry').value = '';
+            document.getElementById('cardCvc').value = '';
+            
+            showSection('home');
+        } else {
+            alert("❌ 結帳失敗：" + result.message);
         }
-
+    } catch (error) {
+        console.error("結帳連線發生錯誤:", error);
+        alert("結帳系統連線失敗！");
+    }
+}
         function renderOrders() {
             const user = localStorage.getItem('user');
             const ordersList = document.getElementById('ordersList');

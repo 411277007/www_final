@@ -92,11 +92,31 @@
                     <h3 class="fw-bold mb-4">填寫收件人資訊</h3>
                     <form id="checkoutForm" onsubmit="reviewOrder(event)">
                         <div class="row mb-3">
-                            <div class="col-md-6"><label class="form-label">收件人姓名</label><input type="text" id="recvName" class="form-control" required></div>
-                            <div class="col-md-6"><label class="form-label">聯絡電話</label><input type="tel" id="recvPhone" class="form-control" pattern="09[0-9]{8}" placeholder="09xxxxxxxx" required></div>
+                            <div class="col-md-6">
+                                <label class="form-label">收件人姓名</label>
+                                <input type="text" id="recvName" class="form-control" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">聯絡電話</label>
+                                <input type="tel" id="recvPhone" class="form-control" pattern="09[0-9]{8}" placeholder="09xxxxxxxx" required>
+                            </div>
                         </div>
-                        <div class="mb-4"><label class="form-label">送達地址</label><input type="text" id="recvAddress" class="form-control" placeholder="請輸入完整地址" required></div>
-                        <div class="d-flex justify-content-between"><button type="button" class="btn btn-outline-secondary" onclick="showSection('cart')">上一步</button><button type="submit" class="btn btn-primary">下一步：付款確認</button></div>
+                        <div class="mb-3">
+                            <label class="form-label">送達地址</label>
+                            <input type="text" id="recvAddress" class="form-control" placeholder="請輸入完整地址" required>
+                        </div>
+                        
+                        <div class="mb-4 form-check">
+                            <input type="checkbox" class="form-check-input" id="rememberInfo">
+                            <label class="form-check-label text-muted small" for="rememberInfo">
+                                ☑ 記住我的收件資訊（姓名、電話、地址），以便下次結帳時自動填入
+                            </label>
+                        </div>
+
+                        <div class="d-flex justify-content-between">
+                            <button type="button" class="btn btn-outline-secondary" onclick="showSection('cart')">上一步</button>
+                            <button type="submit" class="btn btn-primary">下一步：付款確認</button>
+                        </div>
                     </form>
                 </div>
             </div>
@@ -208,8 +228,8 @@
                 </div>
                 <div class="modal-body">
                     <form onsubmit="handleLogin(event)">
-                        <input type="email" id="loginUser" class="form-control mb-3" placeholder="請輸入 Email">
-                        <input type="password" id="loginPw" class="form-control mb-3" placeholder="請輸入密碼">
+                        <input type="email" id="loginUser" class="form-control mb-3" placeholder="請輸入 Email" required>
+                        <input type="password" id="loginPw" class="form-control mb-3" placeholder="請輸入密碼" required>
                         <button type="submit" class="btn btn-primary w-100">立即登入</button>
                     </form>
                 </div>
@@ -312,7 +332,7 @@
             alert("✅ 已加入專屬購物車！");
         }
 
-        // --- 切換頁面安全防護 (升級加入 profile 頁面) ---
+        // --- 切換頁面安全防護 ---
         function showSection(id) {
             if ((id === 'cart' || id === 'checkoutForm' || id === 'checkoutConfirm' || id === 'orders' || id === 'profile') && !localStorage.getItem('user')) {
                 alert("⚠️ 請先登入才能進行此操作！");
@@ -330,7 +350,6 @@
             if (id === 'orders') {
                 renderOrders();
             }
-            // 💡 如果切換到個人資料頁，立刻載入資料與歷史訂單
             if (id === 'profile') {
                 loadUserProfilePage();
             }
@@ -371,11 +390,11 @@
             renderProducts(cat === '全部' ? products : products.filter(p => p.category === cat));
         }
 
-        document.getElementById('searchInput').onkeyup = function() {
-            const val = this.value.toLowerCase();
+        function searchProducts() {
+            const val = document.getElementById('searchInput').value.toLowerCase();
             const baseData = currentCategory === '全部' ? products : products.filter(p => p.category === currentCategory);
             renderProducts(baseData.filter(p => p.name.toLowerCase().includes(val)));
-        };
+        }
 
         function showProductDetail(id) {
             const p = products.find(x => x.id === id);
@@ -389,21 +408,60 @@
             showSection('detail');
         }
 
+        // --- 🔄 修改：填寫收件資訊前，先自動載入記住的資訊 ---
         function goToCheckout() {
             if (cart.length === 0) return alert("購物車是空的！");
+            
+            const user = localStorage.getItem('user');
             showSection('checkoutForm');
+
+            // 自動檢查是否有儲存過收件資訊 (以目前登入的 user 帳號為隔離基礎)
+            const savedInfo = JSON.parse(localStorage.getItem('saved_shipping_' + user));
+            
+            if (savedInfo) {
+                document.getElementById('recvName').value = savedInfo.name || '';
+                document.getElementById('recvPhone').value = savedInfo.phone || '';
+                document.getElementById('recvAddress').value = savedInfo.address || '';
+                document.getElementById('rememberInfo').checked = true; // 幫用戶維持勾選狀態
+            } else {
+                // 如果沒有存過，就保持空白，交給顧客自己填寫
+                document.getElementById('recvName').value = '';
+                document.getElementById('recvPhone').value = '';
+                document.getElementById('recvAddress').value = '';
+                document.getElementById('rememberInfo').checked = false;
+            }
         }
 
+        // --- 🔄 修改：預覽訂單時，同步處理「是否記住資訊」的儲存邏輯 ---
         function reviewOrder(e) {
             e.preventDefault();
-            document.getElementById('confName').innerText = document.getElementById('recvName').value;
-            document.getElementById('confPhone').innerText = document.getElementById('recvPhone').value;
-            document.getElementById('confAddress').innerText = document.getElementById('recvAddress').value;
+            
+            const user = localStorage.getItem('user');
+            const name = document.getElementById('recvName').value.trim();
+            const phone = document.getElementById('recvPhone').value.trim();
+            const address = document.getElementById('recvAddress').value.trim();
+            const isRemember = document.getElementById('rememberInfo').checked;
+
+            // 核心邏輯：根據勾選狀態儲存或清除資料
+            if (isRemember) {
+                const shippingInfo = { name, phone, address };
+                localStorage.setItem('saved_shipping_' + user, JSON.stringify(shippingInfo));
+            } else {
+                // 如果這次取消勾選，代表顧客不想記住，就從本機快取中移除
+                localStorage.removeItem('saved_shipping_' + user);
+            }
+
+            // 將資料帶入確認刷卡頁面
+            document.getElementById('confName').innerText = name;
+            document.getElementById('confPhone').innerText = phone;
+            document.getElementById('confAddress').innerText = address;
             document.getElementById('confCartItems').innerHTML = cart.map(c => `<li class="list-group-item d-flex justify-content-between">${c.name} x${c.qty} <span>$${c.price * c.qty}</span></li>`).join('');
             document.getElementById('confTotal').innerText = `$${cart.reduce((a,b) => a + (b.price * b.qty), 0) + 60}`;
+            
             showSection('checkoutConfirm');
         }
 
+        // --- 🔄 修改：付款成功後的表單重設 (手動重設，避免清除剛保存的 localStorage 資料) ---
         async function processPayment() {
             const cNum = document.getElementById('cardNum').value;
             const cExp = document.getElementById('cardExpiry').value;
@@ -448,7 +506,12 @@
                     cart = []; 
                     localStorage.removeItem('cart_' + user); 
                     updateCartUI();
-                    document.getElementById('checkoutForm').reset();
+
+                    // 清空付款卡號表單
+                    document.getElementById('cardNum').value = '';
+                    document.getElementById('cardExpiry').value = '';
+                    document.getElementById('cardCvc').value = '';
+                    
                     showSection('home');
                 } else {
                     alert("❌ 結帳失敗：" + result.message);
@@ -499,85 +562,73 @@
                 </div>`).join('');
         }
 
-        // --- 💡 新增：載入個人資料與歷史訂單紀錄 ---
-// --- 🔄 修改：從資料庫載入個人資料 ---
-async function loadUserProfilePage() {
-    const user = localStorage.getItem('user'); // 這是目前登入的 Email
-    if (!user) return;
+        // --- 從資料庫載入個人資料 ---
+        async function loadUserProfilePage() {
+            const user = localStorage.getItem('user');
+            if (!user) return;
 
-    // 1. 設定 Email 欄位（不可修改）
-    document.getElementById('profEmail').value = user;
+            document.getElementById('profEmail').value = user;
 
-    try {
-        // 向後端 API 發送 GET 請求獲取資料庫資料
-        const response = await fetch(`./profile_api.php?email=${encodeURIComponent(user)}`);
-        const result = await response.json();
+            try {
+                const response = await fetch(`./profile_api.php?email=${encodeURIComponent(user)}`);
+                const result = await response.json();
 
-        if (result.status === 'success') {
-            // 成功撈到資料庫資料，填入表單
-            const profile = result.data;
-            document.getElementById('profName').value = profile.name;
-            document.getElementById('profGender').value = profile.gender || '';
-            document.getElementById('profPhone').value = profile.phone || '';
-            document.getElementById('profBirthday').value = profile.birthday || '';
-            
-            // 可以在主控台查看目前這名會員在資料庫的自動 ID 分別
-            console.log(`目前會員資料庫 ID: ${profile.id}`);
-        } else {
-            // 如果資料庫還沒有，抓取當初註冊時暫存的名字來初始化
-            const defaultName = localStorage.getItem('regName_' + user) || user.split('@')[0];
-            document.getElementById('profName').value = defaultName;
-            document.getElementById('profGender').value = '';
-            document.getElementById('profPhone').value = '';
-            document.getElementById('profBirthday').value = '';
+                if (result.status === 'success') {
+                    const profile = result.data;
+                    document.getElementById('profName').value = profile.name;
+                    document.getElementById('profGender').value = profile.gender || '';
+                    document.getElementById('profPhone').value = profile.phone || '';
+                    document.getElementById('profBirthday').value = profile.birthday || '';
+                    console.log(`目前會員資料庫 ID: ${profile.id}`);
+                } else {
+                    const defaultName = localStorage.getItem('regName_' + user) || user.split('@')[0];
+                    document.getElementById('profName').value = defaultName;
+                    document.getElementById('profGender').value = '';
+                    document.getElementById('profPhone').value = '';
+                    document.getElementById('profBirthday').value = '';
+                }
+            } catch (error) {
+                console.error("無法從資料庫讀取資料:", error);
+            }
+
+            renderHistoryOrdersList();
         }
-    } catch (error) {
-        console.error("無法從資料庫讀取資料:", error);
-    }
 
-    // 2. 渲染右側的歷史訂購紀錄清單（維持原有機制）
-    renderHistoryOrdersList();
-}
-
-// --- 🔄 修改：將修改後的個人資料儲存至資料庫 ---
-async function saveUserProfile(e) {
-    e.preventDefault();
-    const user = localStorage.getItem('user');
-    
-    const updatedProfile = {
-        email: user,
-        name: document.getElementById('profName').value.trim(),
-        gender: document.getElementById('profGender').value,
-        phone: document.getElementById('profPhone').value.trim(),
-        birthday: document.getElementById('profBirthday').value
-    };
-
-    try {
-        // 向後端 API 發送 POST 請求，將 JSON 送入資料庫
-        const response = await fetch('./profile_api.php', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(updatedProfile)
-        });
-        const result = await response.json();
-
-        if (result.status === 'success') {
-            // 同步更新網頁右上角的歡迎詞
-            document.getElementById('userGreeting').innerText = `👋 會員 ${updatedProfile.name}`;
-            alert(`🎉 資料庫儲存成功！(您的會員識別 ID 為: ${result.db_id})`);
+        // --- 將修改後的個人資料儲存至資料庫 ---
+        async function saveUserProfile(e) {
+            e.preventDefault();
+            const user = localStorage.getItem('user');
             
-            // 重新整理頁面欄位
-            loadUserProfilePage();
-        } else {
-            alert("❌ 儲存失敗：" + result.message);
-        }
-    } catch (error) {
-        console.error("連線資料庫發生錯誤:", error);
-        alert("資料庫連線失敗！");
-    }
-}
+            const updatedProfile = {
+                email: user,
+                name: document.getElementById('profName').value.trim(),
+                gender: document.getElementById('profGender').value,
+                phone: document.getElementById('profPhone').value.trim(),
+                birthday: document.getElementById('profBirthday').value
+            };
 
-        // --- 💡 新增：渲染歷史訂購紀錄清單 ---
+            try {
+                const response = await fetch('./profile_api.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(updatedProfile)
+                });
+                const result = await response.json();
+
+                if (result.status === 'success') {
+                    document.getElementById('userGreeting').innerText = `👋 會員 ${updatedProfile.name}`;
+                    alert(`🎉 資料庫儲存成功！(您的會員識別 ID 為: ${result.db_id})`);
+                    loadUserProfilePage();
+                } else {
+                    alert("❌ 儲存失敗：" + result.message);
+                }
+            } catch (error) {
+                console.error("連線資料庫發生錯誤:", error);
+                alert("資料庫連線失敗！");
+            }
+        }
+
+        // --- 渲染歷史訂購紀錄清單 ---
         function renderHistoryOrdersList() {
             const user = localStorage.getItem('user');
             const container = document.getElementById('historyOrdersList');
@@ -601,92 +652,82 @@ async function saveUserProfile(e) {
                             <span class="badge bg-success text-white">已建立 (${order.status})</span>
                         </div>
                         <div class="small text-muted bg-light p-2 rounded mb-2">
-                            ${order.items.map(item => `• ${item.name} (x${item.qty})`).join('<br>')}
+                            <strong>收件資訊：</strong>已送往指定地址
                         </div>
-                        <div class="text-end fw-bold text-danger">實付總額: $${order.total}</div>
+                        <div class="text-end small">
+                            共 ${order.items.reduce((a,b) => a+b.qty, 0)} 件商品，實付總額：<strong class="text-danger">$${order.total}</strong>
+                        </div>
                     </div>
-                </div>
-            `).join('');
+                </div>`).join('');
         }
 
-        // --- 註冊連線處理 ---
-        async function handleRegister(e) { 
-            e.preventDefault(); 
+        // --- 模擬登入與註冊狀態控制功能 ---
+        function checkUserStatus() {
+            const user = localStorage.getItem('user');
+            const authButtons = document.getElementById('authButtons');
+            const userInfo = document.getElementById('userInfo');
+            
+            if (user) {
+                authButtons.classList.add('hidden');
+                userInfo.classList.remove('hidden');
+                const savedName = localStorage.getItem('regName_' + user) || user.split('@')[0];
+                document.getElementById('userGreeting').innerText = `👋 會員 ${savedName}`;
+            } else {
+                authButtons.classList.remove('hidden');
+                userInfo.classList.add('hidden');
+            }
+        }
+
+        function handleLogin(e) {
+            e.preventDefault();
+            const email = document.getElementById('loginUser').value.trim();
+            localStorage.setItem('user', email);
+            
+            // 登入後關閉 Modal
+            const modalEl = document.getElementById('loginModal');
+            const modal = bootstrap.Modal.getInstance(modalEl);
+            if (modal) modal.hide();
+            
+            checkUserStatus();
+            loadUserCart();
+            updateCartUI();
+            showSection('home');
+            alert("🎉 登入成功！歡迎回來。");
+        }
+
+        function handleRegister(e) {
+            e.preventDefault();
             const name = document.getElementById('regName').value.trim();
-            const username = document.getElementById('regUser').value.trim(); 
-            const password = document.getElementById('regPw').value;
-            const passwordConfirm = document.getElementById('regPwConfirm').value;
-            
-            if (password !== passwordConfirm) {
-                alert("❌ 註冊失敗：兩次輸入的密碼不一致！");
-                return; 
+            const email = document.getElementById('regUser').value.trim();
+            const pw = document.getElementById('regPw').value;
+            const pwConfirm = document.getElementById('regPwConfirm').value;
+
+            if (pw !== pwConfirm) {
+                alert("❌ 兩次密碼輸入不一致！");
+                return;
             }
-            try {
-                const response = await fetch('./register.php', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ username, password })
-                });
-                const result = await response.json();
-                if (result.status === 'success') {
-                    // 註冊成功時把名字暫存，以便未來個人資料初始化使用
-                    localStorage.setItem('regName_' + username, name);
-                    alert("✅ " + result.message); 
-                    bootstrap.Modal.getInstance(document.getElementById('registerModal')).hide(); 
-                    e.target.reset();
-                } else {
-                    alert("❌ 註冊失敗：" + result.message);
-                }
-            } catch (error) {
-                console.error("註冊連線錯誤:", error);
-            }
+
+            localStorage.setItem('regName_' + email, name);
+            localStorage.setItem('user', email);
+
+            const modalEl = document.getElementById('registerModal');
+            const modal = bootstrap.Modal.getInstance(modalEl);
+            if (modal) modal.hide();
+
+            checkUserStatus();
+            loadUserCart();
+            updateCartUI();
+            showSection('home');
+            alert("✨ 註冊成功！已自動為您登入。");
         }
 
-        // --- 登入連線處理 ---
-        async function handleLogin(e) { 
-            e.preventDefault(); 
-            const username = document.getElementById('loginUser').value.trim(); 
-            const password = document.getElementById('loginPw').value.trim();   
-            
-            if (username === "" || password === "") {
-                alert("❌ 登入失敗：請輸入帳號或密碼！");
-                return; 
-            }
-            try {
-                const response = await fetch('./login.php', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ username, password })
-                });
-                const result = await response.json();
-                if (result.status === 'success') {
-                    alert("🔑 歡迎回來！登入成功。");
-                    localStorage.setItem('user', result.username); 
-                    location.reload(); 
-                } else {
-                    alert("❌ 登入失敗：" + result.message);
-                }
-            } catch (error) {
-                console.error("登入連線錯誤:", error);
-            }
-        }
-
-        function checkUserStatus() { 
-            const user = localStorage.getItem('user'); 
-            if (user) { 
-                document.getElementById('authButtons').classList.add('hidden'); 
-                document.getElementById('userInfo').classList.remove('hidden'); 
-                
-                // 優先抓取修改過後的姓名，沒有的話才顯示 Email
-                const profile = JSON.parse(localStorage.getItem('profile_' + user));
-                const displayName = profile ? profile.name : (localStorage.getItem('regName_' + user) || user);
-                document.getElementById('userGreeting').innerText = `👋 會員 ${displayName}`; 
-            } 
-        }
-
-        function logout() { 
-            localStorage.removeItem('user'); 
-            location.reload(); 
+        function logout() {
+            localStorage.removeItem('user');
+            checkUserStatus();
+            cart = [];
+            updateCartUI();
+            showSection('home');
+            alert("👋 您已成功登出。");
         }
     </script>
 </body>

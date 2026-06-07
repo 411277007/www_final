@@ -10,8 +10,9 @@ $data = json_decode(file_get_contents('php://input'), true);
 $username = trim($data['username'] ?? '');
 $password = trim($data['password'] ?? '');
 
+// 🛑 後端二次防線：如果前端傳過來的欄位是空的，回傳無帳號或密碼的錯誤
 if (empty($username) || empty($password)) {
-    echo json_encode(["status" => "error", "message" => "請輸入帳號和密碼！"]);
+    echo json_encode(["status" => "error", "message" => "無帳號或密碼，請重新輸入！"]);
     exit;
 }
 
@@ -23,14 +24,13 @@ try {
 
     // 2. 驗證帳號是否存在，以及加密密碼是否相符
     if ($user && password_verify($password, $user['password'])) {
-        // 登入成功，回傳帳號給前端
         echo json_encode([
             "status" => "success",
             "message" => "登入成功！",
             "username" => $user['username']
         ]);
     } else {
-        // 帳號不存在或密碼錯誤
+        // 帳號不存在或密碼錯誤的提示
         echo json_encode(["status" => "error", "message" => "帳號或密碼錯誤，請重新確認！"]);
     }
 

@@ -158,153 +158,304 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        let products = []; // 改為空陣列等待後端資料
-        let cart = JSON.parse(localStorage.getItem('cart')) || [];
-        let currentCategory = '全部';
+        // --- 全局變數宣告 ---
+let products = []; 
+let cart = []; // 預設先空著，等確認登入狀態後再載入
+let currentCategory = '全部';
 
-        window.onload = async () => { 
-            await fetchProductsFromAPI(); // 先去後端拿資料
-            updateCartUI(); 
-            checkUserStatus(); 
-        };
+// 網頁載入時的初始化流程
+window.onload = async () => { 
+    await fetchProductsFromAPI(); // 1. 先抓商品
+    checkUserStatus();            // 2. 檢查會員登入狀態
+    loadUserCart();               // 3. 根據登入的帳戶載入對應的購物車
+    updateCartUI();               // 4. 更新購物車畫面
+};
 
-// 新增這段向 PHP 索取資料的函式
-        async function fetchProductsFromAPI() {
-            try {
-        // 請確保這裡的網址對應到你伺服器上 get_products.php 的實際路徑
-                const response = await fetch('http://localhost/easygo/get_products.php');
-                const result = await response.json();
-        
-                if (result.status === 'success') {
-                    products = result.data; // 將後端傳來的資料存入全域變數
-                    renderProducts(products); // 渲染畫面
-                } else {
-                    console.error("獲取商品失敗:", result.message);
-                }
-            } catch (error) {
-                console.error("API 連線錯誤:", error);
-            }
-        }
-
-        function renderProducts(data) {
-            const grid = document.getElementById('productGrid');
-            grid.innerHTML = data.map(p => `
-                <div class="col"><div class="card h-100 product-card shadow-sm" onclick="showProductDetail(${p.id})">
-                    <img src="${p.img}" class="card-img-top" style="height: 180px; object-fit: cover;">
-                    <div class="card-body text-center">
-                        <span class="badge bg-secondary mb-2">${p.category}</span>
-                        <h5 class="card-title fw-bold fs-6">${p.name}</h5>
-                        <h5 class="text-danger fw-bold">$${p.price}</h5>
-                    </div>
-                </div></div>`).join('');
-        }
-
-        function filterSidebar(cat, btn) {
-            currentCategory = cat;
-            document.querySelectorAll('.sidebar-btn').forEach(b => b.classList.remove('active', 'fw-bold'));
-            btn.classList.add('active', 'fw-bold');
-            renderProducts(cat === '全部' ? products : products.filter(p => p.category === cat));
-        }
-
-        function searchProducts() {
-            const val = document.getElementById('searchInput').value.toLowerCase();
-            const baseData = currentCategory === '全部' ? products : products.filter(p => p.category === currentCategory);
-            renderProducts(baseData.filter(p => p.name.toLowerCase().includes(val)));
-        }
-
-        function showProductDetail(id) {
-            const p = products.find(x => x.id === id);
-            document.getElementById('detailContent').innerHTML = `
-                <div class="col-md-6"><img src="${p.img}" class="detail-img"></div>
-                <div class="col-md-6 d-flex flex-column justify-content-center">
-                    <span class="badge bg-secondary w-25 mb-2">${p.category}</span><h2 class="fw-bold">${p.name}</h2>
-                    <h3 class="text-danger fw-bold my-3">$${p.price}</h3><p class="text-muted fs-5">${p.desc}</p>
-                    <button class="btn btn-primary btn-lg mt-auto shadow" onclick="addToCart(${p.id})">🛒 加入購物車</button>
-                </div>`;
-            showSection('detail');
-        }
-
-        function addToCart(id) {
-            const item = products.find(p => p.id === id);
-            const found = cart.find(c => c.id === id);
-            if (found) found.qty++; else cart.push({...item, qty: 1});
-            saveCart(); alert("✅ 已加入購物車！");
-        }
-
-        function saveCart() { localStorage.setItem('cart', JSON.stringify(cart)); updateCartUI(); }
-
-        function updateCartUI() {
-            document.getElementById('badgeCount').innerText = cart.reduce((a,b) => a + b.qty, 0);
-            const list = document.getElementById('cartItemsList');
-            if (cart.length === 0) { list.innerHTML = "<p class='text-center my-5'>購物車是空的</p>"; return; }
-            list.innerHTML = cart.map(c => `<div class="d-flex align-items-center mb-3 pb-3 border-bottom">
-                <img src="${c.img}" style="width:60px; height:60px; object-fit:cover; border-radius:5px;">
-                <div class="ms-3 flex-grow-1"><h6 class="mb-0">${c.name}</h6><small class="text-danger">$${c.price}</small></div>
-                <div class="d-flex align-items-center">
-                    <button class="btn btn-sm btn-outline-secondary" onclick="changeQty(${c.id}, -1)">-</button><span class="mx-2">${c.qty}</span><button class="btn btn-sm btn-outline-secondary" onclick="changeQty(${c.id}, 1)">+</button>
-                    <button class="btn btn-link text-danger btn-sm ms-2" onclick="removeItem(${c.id})">刪除</button>
-                </div></div>`).join('');
-            const sub = cart.reduce((a,b) => a + (b.price * b.qty), 0);
-            document.getElementById('subtotal').innerText = `$${sub}`;
-            document.getElementById('totalPrice').innerText = `$${sub + 60}`;
-        }
-
-        function changeQty(id, delta) { const item = cart.find(c => c.id === id); item.qty += delta; if (item.qty < 1) removeItem(id); else saveCart(); }
-        function removeItem(id) { cart = cart.filter(c => c.id !== id); saveCart(); }
-
-        function goToCheckout() {
-            if (cart.length === 0) return alert("購物車是空的！");
-            if (!localStorage.getItem('user')) { alert("請先登入！"); return; }
-            showSection('checkoutForm');
-        }
-
-        function reviewOrder(e) {
-            e.preventDefault();
-            document.getElementById('confName').innerText = document.getElementById('recvName').value;
-            document.getElementById('confPhone').innerText = document.getElementById('recvPhone').value;
-            document.getElementById('confAddress').innerText = document.getElementById('recvAddress').value;
-            document.getElementById('confCartItems').innerHTML = cart.map(c => `<li class="list-group-item d-flex justify-content-between">${c.name} x${c.qty} <span>$${c.price * c.qty}</span></li>`).join('');
-            document.getElementById('confTotal').innerText = `$${cart.reduce((a,b) => a + (b.price * b.qty), 0) + 60}`;
-            showSection('checkoutConfirm');
-        }
-
-        // --- 核心更新：處理信用卡付款驗證 ---
-        function processPayment() {
-            const cNum = document.getElementById('cardNum').value;
-            const cExp = document.getElementById('cardExpiry').value;
-            const cCvc = document.getElementById('cardCvc').value;
-
-            // 簡單的資料驗證
-            if (cNum.length < 12 || cExp === "" || cCvc.length < 3) {
-                alert("❌ 請輸入完整的信用卡資訊以完成支付。");
-                return;
-            }
-
-            alert(`💳 授權成功！\n卡號末四碼 ${cNum.slice(-4)} 已成功支付。\n我們會盡快將商品送到：${document.getElementById('confAddress').innerText}`);
-            cart = []; saveCart(); 
-            document.getElementById('checkoutForm').reset();
-            document.getElementById('cardNum').value = ""; // 清空卡號
-            showSection('home');
-        }
-
-        function handleLogin(e) { e.preventDefault(); localStorage.setItem('user', e.target[0].value.split('@')[0]); location.reload(); }
-        function handleRegister(e) { 
-            e.preventDefault(); 
-            const password = document.getElementById('regPw').value;
-            const passwordConfirm = document.getElementById('regPwConfirm').value;
-        if (password !== passwordConfirm) {
-            alert(" 註冊失敗：兩次輸入的密碼不一致，請重新確認！");
-            document.getElementById('regPwConfirm').value = "";
-            document.getElementById('regPwConfirm').focus();
-            return; 
-        }
-        alert("✅ 註冊成功！歡迎加入 EasyGo。"); 
-        bootstrap.Modal.getInstance(document.getElementById('registerModal')).hide(); 
-        e.target.reset();
+// --- 帳戶與購物車綁定核心邏輯 ---
+function loadUserCart() {
+    const user = localStorage.getItem('user');
+    if (user) {
+        // 💡 核心亮點：將購物車 Key 綁定用戶名（例如：cart_admin），不同帳號不會串連！
+        cart = JSON.parse(localStorage.getItem('cart_' + user)) || [];
+    } else {
+        cart = []; // 沒登入時，購物車強制清空
     }
-        function checkUserStatus() { const user = localStorage.getItem('user'); if (user) { document.getElementById('authButtons').classList.add('hidden'); document.getElementById('userInfo').classList.remove('hidden'); document.getElementById('userGreeting').innerText = `👋 會員 ${user}`; } }
-        function logout() { localStorage.removeItem('user'); location.reload(); }
-        function showSection(id) { ['home', 'detail', 'cart', 'checkoutForm', 'checkoutConfirm'].forEach(s => document.getElementById(`${s}Section`).classList.add('hidden')); document.getElementById(`${id}Section`).classList.remove('hidden'); window.scrollTo(0, 0); }
+}
+
+function saveCart() {
+    const user = localStorage.getItem('user');
+    if (user) {
+        // 儲存到該帳號專屬的儲存空間
+        localStorage.setItem('cart_' + user, JSON.stringify(cart));
+    }
+    updateCartUI();
+}
+
+// --- 向 PHP 索取資料的非同步函式 ---
+async function fetchProductsFromAPI() {
+    try {
+        const response = await fetch('./get_products.php');
+        const result = await response.json();
+        if (result.status === 'success') {
+            products = result.data;
+            renderProducts(products);
+        } else {
+            console.error("獲取商品失敗:", result.message);
+        }
+    } catch (error) {
+        console.error("API 連線錯誤:", error);
+    }
+}
+
+// --- 渲染商品到首頁 ---
+function renderProducts(data) {
+    const grid = document.getElementById('productGrid');
+    if(data.length === 0) {
+        grid.innerHTML = "<h4 class='text-center w-100 my-5 text-muted'>目前沒有商品資料</h4>";
+        return;
+    }
+    grid.innerHTML = data.map(p => `
+        <div class="col"><div class="card h-100 product-card shadow-sm" onclick="showProductDetail(${p.id})">
+            <img src="${p.img}" class="card-img-top" style="height: 180px; object-fit: cover;">
+            <div class="card-body text-center">
+                <span class="badge bg-secondary mb-2">${p.category}</span>
+                <h5 class="card-title fw-bold fs-6">${p.name}</h5>
+                <h5 class="text-danger fw-bold">$${p.price}</h5>
+            </div>
+        </div></div>`).join('');
+}
+
+// --- 雙重安全攔截一：加入購物車前檢查 ---
+function addToCart(id) {
+    // 🛑 檢查是否登入
+    if (!localStorage.getItem('user')) {
+        alert("⚠️ 請先登入才能使用購物車功能！");
+        // 如果你有 Bootstrap 登入彈窗，可以在這裡自動幫他打開：
+        // new bootstrap.Modal(document.getElementById('loginModal')).show();
+        return; // 直接中斷，不讓他加入
+    }
+
+    const item = products.find(p => p.id === id);
+    const found = cart.find(c => c.id === id);
+    if (found) found.qty++; else cart.push({...item, qty: 1});
+    saveCart(); 
+    alert("✅ 已加入專屬購物車！");
+}
+
+// --- 雙重安全攔截二：切換頁面安全防護 ---
+function showSection(id) {
+    // 🛑 如果企圖進入「購物車頁面」或「結帳頁面」但沒有登入，直接無情彈窗並擋下！
+    if ((id === 'cart' || id === 'checkoutForm' || id === 'checkoutConfirm') && !localStorage.getItem('user')) {
+        alert("⚠️ 請先登入才能觀看購物車或進行結帳！");
+        return; // 中斷切換頁面
+    }
+
+    // 正常的切換頁面邏輯
+    ['home', 'detail', 'cart', 'checkoutForm', 'checkoutConfirm'].forEach(s => {
+        const el = document.getElementById(`${s}Section`);
+        if (el) el.classList.add('hidden');
+    }); 
+    const targetEl = document.getElementById(`${id}Section`);
+    if (targetEl) targetEl.classList.remove('hidden');
+    window.scrollTo(0, 0);
+}
+
+// --- 更新購物車介面 ---
+function updateCartUI() {
+    const badge = document.getElementById('badgeCount');
+    if(badge) badge.innerText = cart.reduce((a,b) => a + b.qty, 0);
+
+    const list = document.getElementById('cartItemsList');
+    if(!list) return;
+    
+    if (cart.length === 0) { 
+        list.innerHTML = "<p class='text-center my-5'>購物車是空的</p>"; 
+        return; 
+    }
+    
+    list.innerHTML = cart.map(c => `<div class="d-flex align-items-center mb-3 pb-3 border-bottom">
+        <img src="${c.img}" style="width:60px; height:60px; object-fit:cover; border-radius:5px;">
+        <div class="ms-3 flex-grow-1"><h6 class="mb-0">${c.name}</h6><small class="text-danger">$${c.price}</small></div>
+        <div class="d-flex align-items-center">
+            <button class="btn btn-sm btn-outline-secondary" onclick="changeQty(${c.id}, -1)">-</button><span class="mx-2">${c.qty}</span><button class="btn btn-sm btn-outline-secondary" onclick="changeQty(${c.id}, 1)">+</button>
+            <button class="btn btn-link text-danger btn-sm ms-2" onclick="removeItem(${c.id})">刪除</button>
+        </div></div>`).join('');
+        
+    const sub = cart.reduce((a,b) => a + (b.price * b.qty), 0);
+    document.getElementById('subtotal').innerText = `$${sub}`;
+    document.getElementById('totalPrice').innerText = `$${sub + 60}`;
+}
+
+// --- 購物車內部數量操作 ---
+function changeQty(id, delta) { const item = cart.find(c => c.id === id); item.qty += delta; if (item.qty < 1) removeItem(id); else saveCart(); }
+function removeItem(id) { cart = cart.filter(c => c.id !== id); saveCart(); }
+
+function filterSidebar(cat, btn) {
+    currentCategory = cat;
+    document.querySelectorAll('.sidebar-btn').forEach(b => b.classList.remove('active', 'fw-bold'));
+    btn.classList.add('active', 'fw-bold');
+    renderProducts(cat === '全部' ? products : products.filter(p => p.category === cat));
+}
+
+function searchProducts() {
+    const val = document.getElementById('searchInput').value.toLowerCase();
+    const baseData = currentCategory === '全部' ? products : products.filter(p => p.category === currentCategory);
+    renderProducts(baseData.filter(p => p.name.toLowerCase().includes(val)));
+}
+
+function showProductDetail(id) {
+    const p = products.find(x => x.id === id);
+    document.getElementById('detailContent').innerHTML = `
+        <div class="col-md-6"><img src="${p.img}" class="detail-img" style="max-height:400px; object-fit:cover; width:100%;"></div>
+        <div class="col-md-6 d-flex flex-column justify-content-center">
+            <span class="badge bg-secondary w-25 mb-2">${p.category}</span><h2 class="fw-bold">${p.name}</h2>
+            <h3 class="text-danger fw-bold my-3">$${p.price}</h3><p class="text-muted fs-5">${p.desc}</p>
+            <button class="btn btn-primary btn-lg mt-auto shadow" onclick="addToCart(${p.id})">🛒 加入購物車</button>
+        </div>`;
+    showSection('detail');
+}
+
+function goToCheckout() {
+    if (cart.length === 0) return alert("購物車是空的！");
+    showSection('checkoutForm');
+}
+
+function reviewOrder(e) {
+    e.preventDefault();
+    document.getElementById('confName').innerText = document.getElementById('recvName').value;
+    document.getElementById('confPhone').innerText = document.getElementById('recvPhone').value;
+    document.getElementById('confAddress').innerText = document.getElementById('recvAddress').value;
+    document.getElementById('confCartItems').innerHTML = cart.map(c => `<li class="list-group-item d-flex justify-content-between">${c.name} x${c.qty} <span>$${c.price * c.qty}</span></li>`).join('');
+    document.getElementById('confTotal').innerText = `$${cart.reduce((a,b) => a + (b.price * b.qty), 0) + 60}`;
+    showSection('checkoutConfirm');
+}
+
+// --- 結帳處理 ---
+async function processPayment() {
+    const cNum = document.getElementById('cardNum').value;
+    const cExp = document.getElementById('cardExpiry').value;
+    const cCvc = document.getElementById('cardCvc').value;
+
+    if (cNum.length < 12 || cExp === "" || cCvc.length < 3) {
+        alert("❌ 請輸入完整的信用卡資訊以完成支付。");
+        return;
+    }
+
+    const orderData = {
+        name: document.getElementById('confName').innerText,
+        phone: document.getElementById('confPhone').innerText,
+        address: document.getElementById('confAddress').innerText,
+        total: document.getElementById('confTotal').innerText.replace('$', '')
+    };
+
+    try {
+        const response = await fetch('./save_order.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(orderData)
+        });
+        const result = await response.json();
+        if (result.status === 'success') {
+            alert(`💳 授權成功！(訂單編號: #${result.order_id})\n付款成功。我們會盡快將商品送達。`);
+            const user = localStorage.getItem('user');
+            cart = []; 
+            localStorage.removeItem('cart_' + user); // 清空該專屬帳號的本機購物車
+            updateCartUI();
+            document.getElementById('checkoutForm').reset();
+            showSection('home');
+        } else {
+            alert("❌ 結帳失敗：" + result.message);
+        }
+    } catch (error) {
+        console.error("結帳連線發生錯誤:", error);
+    }
+}
+
+// --- 會員登入登出 ---
+// --- 註冊連線處理 (修正後端連線版) ---
+async function handleRegister(e) { 
+    e.preventDefault(); 
+    
+    // 抓取前端輸入框的值
+    const username = document.getElementById('regUser').value; // 請確保 HTML 的註冊帳號 input 有 id="regUser"
+    const password = document.getElementById('regPw').value;
+    const passwordConfirm = document.getElementById('regPwConfirm').value;
+    
+    // 驗證二次密碼
+    if (password !== passwordConfirm) {
+        alert("❌ 註冊失敗：兩次輸入的密碼不一致！");
+        return; 
+    }
+    
+    try {
+        // 發送非同步請求給後端 PHP
+        const response = await fetch('./register.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, password })
+        });
+        
+        const result = await response.json();
+        
+        if (result.status === 'success') {
+            alert("✅ " + result.message); 
+            // 關閉註冊視窗並重設表單
+            bootstrap.Modal.getInstance(document.getElementById('registerModal')).hide(); 
+            e.target.reset();
+        } else {
+            alert("❌ 註冊失敗：" + result.message);
+        }
+    } catch (error) {
+        console.error("註冊連線錯誤:", error);
+        alert("註冊連線失敗，請檢查後端服務狀態！");
+    }
+}
+
+// --- 登入連線處理 (修正後端連線版) ---
+async function handleLogin(e) { 
+    e.preventDefault(); 
+    
+    // 抓取前端輸入框的值
+    const username = document.getElementById('loginUser').value; // 請確保 HTML 的登入帳號 input 有 id="loginUser"
+    const password = document.getElementById('loginPw').value;   // 請確保 HTML 的登入密碼 input 有 id="loginPw"
+    
+    try {
+        // 發送非同步請求給後端 PHP 驗證帳密
+        const response = await fetch('./login.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, password })
+        });
+        
+        const result = await response.json();
+        
+        if (result.status === 'success') {
+            alert("🔑 歡迎回來！登入成功。");
+            // 將從資料庫回傳的正確使用者名稱存入本機
+            localStorage.setItem('user', result.username); 
+            location.reload(); // 重新整理頁面以更新畫面與專屬購物車
+        } else {
+            alert("❌ 登入失敗：" + result.message);
+        }
+    } catch (error) {
+        console.error("登入連線錯誤:", error);
+        alert("登入連線失敗，請檢查後端服務狀態！");
+    }
+}
+
+function checkUserStatus() { 
+    const user = localStorage.getItem('user'); 
+    if (user) { 
+        document.getElementById('authButtons').classList.add('hidden'); 
+        document.getElementById('userInfo').classList.remove('hidden'); 
+        document.getElementById('userGreeting').innerText = `👋 會員 ${user}`; 
+    } 
+}
+
+function logout() { 
+    localStorage.removeItem('user'); 
+    location.reload(); 
+}
     </script>
 </body>
 </html>

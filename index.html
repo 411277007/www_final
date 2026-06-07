@@ -36,6 +36,7 @@
                 </div>
                 <div class="d-flex align-items-center hidden" id="userInfo">
                     <span id="userGreeting" class="text-white me-3 fw-bold"></span>
+                    <button class="btn btn-warning btn-sm me-2 fw-bold" onclick="showSection('orders')">🚚 運輸中商品</button>
                     <button class="btn btn-outline-danger btn-sm bg-white" onclick="logout()">登出</button>
                 </div>
             </div>
@@ -140,6 +141,14 @@
                 </div>
             </div>
         </div>
+
+        <div id="ordersSection" class="section-container hidden">
+            <button class="btn btn-outline-secondary mb-3" onclick="showSection('home')">⬅ 返回首頁</button>
+            <h2 class="mb-4 fw-bold">🚚 您目前運輸中的商品</h2>
+            <div id="ordersList">
+                </div>
+        </div>
+
     </main>
 
     <button class="btn btn-warning btn-lg rounded-circle cart-fixed shadow" onclick="showSection('cart')">🛒 <span id="badgeCount" class="badge bg-danger">0</span></button>
@@ -186,24 +195,22 @@
     <script>
         // --- 全局變數宣告 ---
         let products = []; 
-        let cart = []; // 預設先空著，等確認登入狀態後再載入
+        let cart = []; 
         let currentCategory = '全部';
 
-        // 網頁載入時的初始化流程
         window.onload = async () => { 
-            await fetchProductsFromAPI(); // 1. 先抓商品
-            checkUserStatus();            // 2. 檢查會員登入狀態
-            loadUserCart();               // 3. 根據登入的帳戶載入對應的購物車
-            updateCartUI();               // 4. 更新購物車畫面
+            await fetchProductsFromAPI(); 
+            checkUserStatus();            
+            loadUserCart();               
+            updateCartUI();               
         };
 
-        // --- 帳戶與購物車綁定核心邏輯 ---
         function loadUserCart() {
             const user = localStorage.getItem('user');
             if (user) {
                 cart = JSON.parse(localStorage.getItem('cart_' + user)) || [];
             } else {
-                cart = []; // 沒登入時，購物車強制清空
+                cart = []; 
             }
         }
 
@@ -215,7 +222,6 @@
             updateCartUI();
         }
 
-        // --- 向 PHP 索取資料的非同步函式 ---
         async function fetchProductsFromAPI() {
             try {
                 const response = await fetch('./get_products.php');
@@ -231,7 +237,6 @@
             }
         }
 
-        // --- 渲染商品到首頁 ---
         function renderProducts(data) {
             const grid = document.getElementById('productGrid');
             if(data.length === 0) {
@@ -249,13 +254,11 @@
                 </div></div>`).join('');
         }
 
-        // --- 加入購物車前檢查 ---
         function addToCart(id) {
             if (!localStorage.getItem('user')) {
                 alert("⚠️ 請先登入才能使用購物車功能！");
                 return; 
             }
-
             const item = products.find(p => p.id === id);
             const found = cart.find(c => c.id === id);
             if (found) found.qty++; else cart.push({...item, qty: 1});
@@ -263,23 +266,29 @@
             alert("✅ 已加入專屬購物車！");
         }
 
-        // --- 切換頁面安全防護 ---
+        // --- 切換頁面安全防護 (升級加入 orders 頁面) ---
         function showSection(id) {
-            if ((id === 'cart' || id === 'checkoutForm' || id === 'checkoutConfirm') && !localStorage.getItem('user')) {
-                alert("⚠️ 請先登入才能觀看購物車或進行結帳！");
+            // 🛑 限制未登入者進入敏感區塊
+            if ((id === 'cart' || id === 'checkoutForm' || id === 'checkoutConfirm' || id === 'orders') && !localStorage.getItem('user')) {
+                alert("⚠️ 請先登入才能進行此操作！");
                 return; 
             }
 
-            ['home', 'detail', 'cart', 'checkoutForm', 'checkoutConfirm'].forEach(s => {
+            // 隱藏所有區塊，顯示目標區塊
+            ['home', 'detail', 'cart', 'checkoutForm', 'checkoutConfirm', 'orders'].forEach(s => {
                 const el = document.getElementById(`${s}Section`);
                 if (el) el.classList.add('hidden');
             }); 
             const targetEl = document.getElementById(`${id}Section`);
             if (targetEl) targetEl.classList.remove('hidden');
             window.scrollTo(0, 0);
+
+            // 💡 如果切換到訂單頁，立刻渲染運輸中的商品
+            if (id === 'orders') {
+                renderOrders();
+            }
         }
 
-        // --- 更新購物車介面 ---
         function updateCartUI() {
             const badge = document.getElementById('badgeCount');
             if(badge) badge.innerText = cart.reduce((a,b) => a + b.qty, 0);
@@ -348,7 +357,7 @@
             showSection('checkoutConfirm');
         }
 
-        // --- 結帳處理 ---
+        // --- 💡 結帳與訂單生成處理 (升級版) ---
         async function processPayment() {
             const cNum = document.getElementById('cardNum').value;
             const cExp = document.getElementById('cardExpiry').value;
@@ -373,26 +382,104 @@
                     body: JSON.stringify(orderData)
                 });
                 const result = await response.json();
+                
                 if (result.status === 'success') {
-                    alert(`💳 授權成功！(訂單編號: #${result.order_id})\n付款成功。我們會盡快將商品送達。`);
+                    alert(`💳 授權成功！(訂單編號: #${result.order_id || '10001'})\n付款成功。我們會盡快將商品送達。`);
+                    
                     const user = localStorage.getItem('user');
+                    
+                    // 📦 【核心新增】：將目前購物車裡的商品打包成「運輸中」訂單存起來
+                    const newOrder = {
+                        order_id: result.order_id || Math.floor(Math.random() * 90000) + 10000,
+                        date: new Date().toLocaleString(),
+                        items: [...cart], // 複製購物車清單
+                        total: orderData.total,
+                        status: '運輸中'
+                    };
+                    
+                    // 讀取舊訂單，並把新訂單塞到最前面（最新）
+                    let userOrders = JSON.parse(localStorage.getItem('orders_' + user)) || [];
+                    userOrders.unshift(newOrder);
+                    localStorage.setItem('orders_' + user, JSON.stringify(userOrders));
+                    
+                    // 清空購物車
                     cart = []; 
                     localStorage.removeItem('cart_' + user); 
                     updateCartUI();
+                    
+                    // 重設收件表單
                     document.getElementById('checkoutForm').reset();
+                    
+                    // 🎯 【滿足需求】：介面回到首頁
                     showSection('home');
+                    
                 } else {
                     alert("❌ 結帳失敗：" + result.message);
                 }
             } catch (error) {
                 console.error("結帳連線發生錯誤:", error);
+                alert("結帳系統連線失敗！");
             }
+        }
+
+        // --- 💡 新增：渲染運輸中商品的函式 ---
+        function renderOrders() {
+            const user = localStorage.getItem('user');
+            const ordersList = document.getElementById('ordersList');
+            if (!ordersList) return;
+
+            // 讀取此使用者的專屬訂單
+            const userOrders = JSON.parse(localStorage.getItem('orders_' + user)) || [];
+
+            if (userOrders.length === 0) {
+                ordersList.innerHTML = `
+                    <div class="bg-white p-5 rounded shadow-sm text-center">
+                        <p class="text-muted fs-5 mb-0">目前沒有運輸中的商品 📦</p>
+                    </div>`;
+                return;
+            }
+
+            // 開始畫訂單清單
+            ordersList.innerHTML = userOrders.map(order => `
+                <div class="card mb-4 shadow-sm border-start border-4 border-warning">
+                    <div class="card-header bg-light d-flex justify-content-between align-items-center py-3">
+                        <div>
+                            <span class="fw-bold text-dark fs-6">訂單編號：#${order.order_id}</span>
+                            <small class="text-muted ms-3">${order.date}</small>
+                        </div>
+                        <span class="badge bg-warning text-dark px-3 py-2 fw-bold">🚚 ${order.status}</span>
+                    </div>
+                    <div class="card-body p-4">
+                        <div class="row align-items-center">
+                            <div class="col-md-8">
+                                <ul class="list-group list-group-flush">
+                                    ${order.items.map(item => `
+                                        <li class="list-group-item d-flex justify-content-between align-items-center px-0 bg-transparent">
+                                            <div class="d-flex align-items-center">
+                                                <img src="${item.img}" style="width:55px; height:55px; object-fit:cover; border-radius:5px;" class="me-3 shadow-sm">
+                                                <div>
+                                                    <h6 class="mb-0 fw-bold text-dark">${item.name}</h6>
+                                                    <small class="text-danger">$${item.price}</small>
+                                                </div>
+                                            </div>
+                                            <span class="badge bg-secondary rounded-pill">x ${item.qty}</span>
+                                        </li>
+                                    `).join('')}
+                                </ul>
+                            </div>
+                            <div class="col-md-4 text-end border-start pt-3 pt-md-0">
+                                <span class="text-muted small d-block mb-1">實付總額</span>
+                                <h3 class="text-danger fw-bold mb-0">$${order.total}</h3>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
         }
 
         // --- 註冊連線處理 ---
         async function handleRegister(e) { 
             e.preventDefault(); 
-            
             const username = document.getElementById('regUser').value; 
             const password = document.getElementById('regPw').value;
             const passwordConfirm = document.getElementById('regPwConfirm').value;
@@ -401,16 +488,13 @@
                 alert("❌ 註冊失敗：兩次輸入的密碼不一致！");
                 return; 
             }
-            
             try {
                 const response = await fetch('./register.php', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ username, password })
                 });
-                
                 const result = await response.json();
-                
                 if (result.status === 'success') {
                     alert("✅ " + result.message); 
                     bootstrap.Modal.getInstance(document.getElementById('registerModal')).hide(); 
@@ -420,36 +504,26 @@
                 }
             } catch (error) {
                 console.error("註冊連線錯誤:", error);
-                alert("註冊連線失敗，請檢查後端服務狀態！");
             }
         }
 
-        // --- 登入連線處理 (修正與防呆版) ---
+        // --- 登入連線處理 ---
         async function handleLogin(e) { 
             e.preventDefault(); 
+            const username = document.getElementById('loginUser').value.trim(); 
+            const password = document.getElementById('loginPw').value.trim();   
             
-            // 抓取剛剛補上 ID 的輸入框，並移除前後空白
-            const usernameInput = document.getElementById('loginUser');
-            const passwordInput = document.getElementById('loginPw');
-            
-            const username = usernameInput ? usernameInput.value.trim() : ""; 
-            const password = passwordInput ? passwordInput.value.trim() : "";   
-            
-            // 🛑 核心防呆：如果帳號或密碼其中一個沒填，直接彈出警告！
             if (username === "" || password === "") {
                 alert("❌ 登入失敗：請輸入帳號或密碼！");
                 return; 
             }
-            
             try {
                 const response = await fetch('./login.php', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ username, password })
                 });
-                
                 const result = await response.json();
-                
                 if (result.status === 'success') {
                     alert("🔑 歡迎回來！登入成功。");
                     localStorage.setItem('user', result.username); 
@@ -459,7 +533,6 @@
                 }
             } catch (error) {
                 console.error("登入連線錯誤:", error);
-                alert("登入連線失敗，請檢查後端服務狀態！");
             }
         }
 
